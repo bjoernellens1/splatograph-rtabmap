@@ -1,0 +1,8 @@
+rgb_topic: /camera/color/image_raw
+depth_topic: /camera/depth/image_raw
+camera_info_topic: /camera/color/camera_info
+pose_topic: /slam/pose
+odom_topic: /slam/odom
+path_topic: /slam/path
+world_frame: map
+camera_frame: camera_color_optical_frame

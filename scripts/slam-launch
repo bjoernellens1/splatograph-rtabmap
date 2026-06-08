@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -eo pipefail
+source /opt/ros/${ROS_DISTRO:-jazzy}/setup.bash
+
+RGB_TOPIC=${RGB_TOPIC:-/camera/color/image_raw}
+DEPTH_TOPIC=${DEPTH_TOPIC:-/camera/depth/image_raw}
+CAMERA_INFO_TOPIC=${CAMERA_INFO_TOPIC:-/camera/color/camera_info}
+FRAME_ID=${FRAME_ID:-camera_color_optical_frame}
+APPROX_SYNC=${APPROX_SYNC:-true}
+QUEUE_SIZE=${QUEUE_SIZE:-30}
+
+exec ros2 launch rtabmap_launch rtabmap.launch.py   rtabmap_viz:=false rviz:=false   localization:=false approx_sync:=${APPROX_SYNC} queue_size:=${QUEUE_SIZE}   frame_id:=${FRAME_ID} rgb_topic:=${RGB_TOPIC} depth_topic:=${DEPTH_TOPIC} camera_info_topic:=${CAMERA_INFO_TOPIC}   odom_topic:=/slam/odom   args:="--delete_db_on_start"   --ros-args   -r /rtabmap/odom:=/slam/odom   -r /rtabmap/mapPath:=/slam/path
