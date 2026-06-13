@@ -36,7 +36,7 @@ ros2 launch rtabmap_launch rtabmap.launch.py \
   frame_id:=camera_color_optical_frame \
   rgb_topic:=/camera/color/image_raw \
   depth_topic:=/camera/depth/image_raw \
-  camera_info_topic:=/camera/color/camera_info \
+  camera_info_topic:=/camera/color/camera_info_synced \
   odom_topic:=/slam/odom \
   rtabmap_args:="--delete_db_on_start ${RTABMAP_ARGS:-}" \
   "${ODOM_ARG_KV[@]}" \
@@ -69,7 +69,13 @@ kill "$RPID" "$SPID" "$DPID" 2>/dev/null || true
 pkill -f rgbd_odometry 2>/dev/null || true; pkill -f rtabmap 2>/dev/null || true
 wait 2>/dev/null || true
 
-# 6. evaluate (Odometry estimate vs PoseStamped reference)
+# 6. evaluate (Odometry estimate vs PoseStamped reference). The rtabmap image
+#    lacks the rosbag2_py python binding; install it once (cached for the rest
+#    of the sweep, which shares the container).
+python3 -c "import rosbag2_py" 2>/dev/null || {
+  echo "[run] installing rosbag2_py..."
+  apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq ros-jazzy-rosbag2-py >/dev/null 2>&1 || true
+}
 python3 /scripts/eval_traj.py "$POSE_BAG" --est /slam/odom --ref /camera_pose \
   --label "$LABEL" --json "${OUTDIR}/${LABEL}.eval.json"
 

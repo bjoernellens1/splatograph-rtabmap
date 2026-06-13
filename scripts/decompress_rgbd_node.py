@@ -23,7 +23,7 @@ import cv2
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import CompressedImage, Image
+from sensor_msgs.msg import CompressedImage, Image, CameraInfo
 from cv_bridge import CvBridge
 
 
@@ -41,13 +41,22 @@ class DecompressRGBD(Node):
         # but the bag stamps them ~100ms apart, which breaks RTAB-Map's approx
         # sync (mispaired frames -> wrong feature depth -> 0 inliers).
         self.sync = self.declare_parameter("sync", False).get_parameter_value().bool_value
+        # republish camera_info re-stamped to the colour stamp + same (reliable)
+        # QoS so RTAB-Map's 3-way approx-sync (rgb+depth+camera_info) aligns at
+        # full rate. Without this the bag's camera_info QoS/stamps starve the sync.
+        self.info_in = g("info_in", "/camera/color/camera_info")
+        self.info_out = g("info_out", "/camera/color/camera_info_synced")
         self.bridge = CvBridge()
         self.n_c = self.n_d = 0
+        self._last_info = None
 
         self.pub_color = self.create_publisher(Image, self.color_out, 10)
         self.pub_depth = self.create_publisher(Image, self.depth_out, 10)
         if self.sync:
             from message_filters import Subscriber, ApproximateTimeSynchronizer
+            self.pub_info = self.create_publisher(CameraInfo, self.info_out, 10)
+            self.create_subscription(CameraInfo, self.info_in,
+                                     lambda m: setattr(self, "_last_info", m), 10)
             cs = Subscriber(self, CompressedImage, self.color_in, qos_profile=qos_profile_sensor_data)
             ds = Subscriber(self, CompressedImage, self.depth_in, qos_profile=qos_profile_sensor_data)
             self._ats = ApproximateTimeSynchronizer([cs, ds], queue_size=30, slop=0.15)
@@ -74,6 +83,10 @@ class DecompressRGBD(Node):
         co.header = cmsg.header
         do.header = cmsg.header  # re-stamp depth to the colour stamp (same capture)
         self.pub_color.publish(co); self.pub_depth.publish(do)
+        if self._last_info is not None:
+            info = self._last_info
+            info.header = cmsg.header  # same colour stamp + frame as rgb/depth
+            self.pub_info.publish(info)
         self.n_c += 1; self.n_d += 1
 
     def _color(self, msg: CompressedImage):
